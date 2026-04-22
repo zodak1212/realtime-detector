@@ -1,133 +1,59 @@
-# Emotion Detection System
+# Multimodal Emotion Detection System
 
-A real-time facial emotion detection system that uses a pretrained EfficientNet-B0 model to classify 7 emotions from webcam input, with live UDP streaming to Unity for avatar expression control.
+This project is a real-time multimodal emotion detection system that uses both facial expressions and speech to predict a person's emotion.
 
-## How It Works
+## How it Works
 
-The system captures video from a webcam and runs each frame through a deep learning pipeline. A pretrained EfficientNet-B0 backbone (originally trained on 14 million ImageNet images) is fine-tuned on facial emotion data to classify expressions into one of seven categories: angry, disgust, fear, happy, sad, surprise, and neutral. Temporal smoothing averages predictions across recent frames to eliminate flickering. The final emotion is sent to Unity via UDP at full frame rate.
-
-## Requirements
-
-- Python 3.9+
-- A webcam
-- A GPU is recommended for training but not required for inference
-- ~3 GB disk space for PyTorch and dependencies
+The system captures video from a webcam and audio from a microphone.
+- A Convolutional Neural Network (CNN) analyzes the facial expression to predict the emotion.
+- A machine learning model (like SVM or Logistic Regression) analyzes the audio features (MFCCs) to predict the emotion from speech.
+- The predictions from both models are combined (fused) to produce a final, more accurate emotion prediction.
 
 ## Installation
 
-Clone the repository and install dependencies:
+1.  Clone the repository or download the source code.
+2.  Install the required Python libraries:
+    ```bash
+    pip install -r requirements.txt
+    ```
+3.  Download the datasets:
+    - **Face Model:** Download the facial emotion dataset from [Kaggle](https://www.kaggle.com/datasets/abhisheksingh016/machine-model-for-emotion-detection). Unzip it and place the `train` and `test` folders inside the `face_model` directory.
+    - **Audio Model:** Download the RAVDESS dataset from [Zenodo](https://zenodo.org/records/1188976). Unzip it and place the `Audio_Speech_Actors_01-24` folder inside the `audio_model` directory.
 
-```bash
-git clone https://github.com/YOUR_USERNAME/emotion-detection.git
-cd emotion-detection
-pip install -r requirements.txt
-```
+## Training the Models
 
-## Step 1 — Prepare the Dataset
+Before running the main application, you need to train the face and audio models.
 
-Download the FER2013 dataset from [Kaggle](https://www.kaggle.com/datasets/msambare/fer2013). You need the `fer2013.csv` file.
+1.  **Train the Face Model:**
+    Navigate to the `face_model` directory and run the training script:
+    ```bash
+    cd face_model
+    python train_face.py
+    cd ..
+    ```
+    This will create a `model.h5` file in the `face_model` directory.
 
-Once downloaded, run the preparation script to convert it into a folder structure for training:
+2.  **Train the Audio Model:**
+    Navigate to the `audio_model` directory and run the training script:
+    ```bash
+    cd audio_model
+    python train_audio.py
+    cd ..
+    ```
+    This will create a `model.pkl` file in the `audio_model` directory.
 
-```bash
-python prepare_dataset.py --csv path/to/fer2013.csv --output ./data
-```
+## Running the Application
 
-This creates a `data/` directory with `train/` and `test/` subfolders, each containing one folder per emotion with the corresponding images inside.
-
-If you already have a folder-based dataset (folders named by emotion containing images), you can use it directly:
-
-```bash
-python prepare_dataset.py --folder path/to/train --test-folder path/to/test
-```
-
-## Step 2 — Train the Model
-
-Run the training script pointing to your prepared dataset:
-
-```bash
-python train.py --train-dir ./data/train --test-dir ./data/test
-```
-
-Training happens in two phases. Phase 1 freezes the pretrained backbone and only trains the new classification head, allowing it to converge quickly without destroying the learned features. Phase 2 unfreezes everything and fine-tunes the entire network at a lower learning rate with differential rates between the backbone and head.
-
-Training will produce three outputs in the `checkpoints/` directory: the best model weights (`best_model.pth`), a training curves plot, and a confusion matrix.
-
-You can customize training with additional flags:
-
-```bash
-python train.py \
-  --train-dir ./data/train \
-  --test-dir ./data/test \
-  --epochs 30 \
-  --batch-size 64 \
-  --output-dir ./checkpoints
-```
-
-## Step 3 — Run the Emotion Detector
-
-Once training is complete, start the real-time detector:
+Once the models are trained and located in their respective directories, you can run the main application:
 
 ```bash
 python main.py
 ```
 
-A window will open showing your webcam feed with the detected emotion overlaid. Press `q` to quit.
+- A window will open showing your webcam feed.
+- The detected face, audio, and final emotions will be printed to the console and displayed on the screen.
+- Press 'q' to quit the application.
 
-The detector also streams the emotion to Unity via UDP on port 5005 by default. You can change the settings:
+## Multimodal Learning
 
-```bash
-python main.py \
-  --model checkpoints/best_model.pth \
-  --port 5005 \
-  --smooth-window 5
-```
-
-The `--smooth-window` flag controls temporal smoothing. A value of 1 gives raw per-frame predictions (more responsive but flickery). The default of 5 averages over the last 5 frames for a good balance. A value of 10 gives very stable output but reacts slower to changes.
-
-## Unity Integration
-
-The detector sends a JSON packet over UDP every frame in the following format:
-
-```json
-{"emotion": "happy", "confidence": 0.87, "timestamp": 1713700000.123}
-```
-
-To receive this in Unity, add the provided C# scripts (`EmotionUDPReceiver.cs`, `EmotionFaceSwapper.cs`) to a GameObject in your scene. Assign 7 emotion sprites in the Inspector and the avatar will swap expressions in real-time based on the detected emotion. See the Unity setup guide for detailed instructions.
-
-## Project Structure
-
-```
-emotion-detection/
-├── requirements.txt          Python dependencies
-├── prepare_dataset.py        Converts FER2013 CSV into training folders
-├── model.py                  EfficientNet-B0 model architecture
-├── train.py                  Two-phase training script
-├── predict.py                Inference module with temporal smoothing
-├── main.py                   Real-time webcam detection + UDP sender
-├── udp_sender.py             UDP sender utility
-└── checkpoints/
-    └── best_model.pth        Trained model weights (generated by train.py)
-```
-
-## Supported Emotions
-
-| Emotion   | Description                        |
-|-----------|------------------------------------|
-| angry     | Furrowed brows, tense expression   |
-| disgust   | Nose wrinkle, upper lip raise      |
-| fear      | Wide eyes, open mouth              |
-| happy     | Smile, raised cheeks               |
-| sad       | Downturned mouth, drooping eyes    |
-| surprise  | Raised eyebrows, open mouth        |
-| neutral   | Relaxed, no strong expression      |
-
-## Troubleshooting
-
-**Training is very slow:** Make sure PyTorch is using your GPU. Run `python -c "import torch; print(torch.cuda.is_available())"` — it should print `True`. If not, install the CUDA version of PyTorch from [pytorch.org](https://pytorch.org/get-started/locally/).
-
-**Low accuracy after training:** FER2013 is a noisy dataset with many mislabelled images. Accuracy around 65-70% is considered good for this dataset. If you are significantly below that, try increasing the number of epochs or adjusting the batch size.
-
-**No face detected:** Make sure your face is well-lit and reasonably centered in the webcam frame. The detector falls back to Haar cascades if the DNN detector is not available, which is less robust in poor lighting.
-
-**UDP not reaching Unity:** Ensure both applications are running on the same machine and using the same port. Check that Windows Firewall is not blocking Unity — add Unity.exe as an allowed application.
+Multimodal learning involves using data from multiple modalities (like image, audio, text) to make a prediction. This approach often leads to better and more robust models because some modalities can provide information that others miss. In this project, we use a simple late fusion technique where we average the probabilities from the face and audio models to get a combined prediction.

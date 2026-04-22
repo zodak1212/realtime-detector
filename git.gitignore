@@ -1,0 +1,8 @@
+# Models
+*.h5
+*.pth
+*.weights
+
+# Python
+__pycache__/
+.env
